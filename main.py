@@ -96,36 +96,27 @@ def calculate_bmi(weight, height_cm):
     height_m = height_cm / 100
     return weight / (height_m ** 2)
 
-def assess_risk_level(age, gender, secondary_signs, bone_age_diff, height_percentile):
-    """Assess precocious puberty risk level"""
-    risk_score = 0
-    
-    # Age criteria
+def assess_risk_level(age, gender, secondary_signs, bone_age_diff):
+    """Assess precocious puberty risk level based on clinical criteria"""
+    # Age threshold for precocious puberty
     if gender == "หญิง":
-        if age < 8:
-            risk_score += 3
-        elif age < 9:
-            risk_score += 1
+        age_threshold = 8
     else:  # ชาย
-        if age < 9:
-            risk_score += 3
-        elif age < 10:
-            risk_score += 1
+        age_threshold = 9
     
-    # Secondary signs
-    risk_score += secondary_signs
+    # Check criteria
+    early_age = age < age_threshold
+    significant_secondary = secondary_signs >= 2
+    advanced_bone_age = bone_age_diff >= 2
     
-    # Bone age advancement
-    if bone_age_diff >= 2:
-        risk_score += 3
-    elif bone_age_diff >= 1:
-        risk_score += 1
-    
-    # Height acceleration
-    if "> P97" in height_percentile:
-        risk_score += 1
-    
-    return risk_score
+    if early_age and significant_secondary and advanced_bone_age:
+        return "high"
+    elif early_age and (significant_secondary or advanced_bone_age):
+        return "medium"
+    elif significant_secondary and advanced_bone_age:
+        return "medium"
+    else:
+        return "low"
 
 # ===================== LAYOUT =====================
 left, right = st.columns([1, 1.4])
@@ -285,14 +276,13 @@ with right:
         """)
         
         # -------- RISK ASSESSMENT --------
-        risk_score = assess_risk_level(age, gender, secondary_count, bone_age_diff, height_perc)
+        risk_level = assess_risk_level(age, gender, secondary_count, bone_age_diff)
         
-        st.markdown("### ⚕️ การประเมินความเสี่ยง")
+        st.markdown("### ⚕️ สรุปผลการประเมิน")
         
-        if risk_score >= 6:
+        if risk_level == "high":
             st.markdown('<div class="risk-high">', unsafe_allow_html=True)
-            st.markdown("#### 🔴 ความเสี่ยงสูง - ต้องพบแพทย์")
-            st.markdown(f"**Risk Score: {risk_score}/10**")
+            st.markdown("#### 🔴 มีความเสี่ยงภาวะโตก่อนวัย")
             st.markdown("""
             **คำแนะนำ:**
             - ควรพบแพทย์เฉพาะทาง (กุมารเวชศาสตร์ต่อมไร้ท่อ) โดยเร็ว
@@ -302,10 +292,9 @@ with right:
             """)
             st.markdown('</div>', unsafe_allow_html=True)
             
-        elif risk_score >= 3:
+        elif risk_level == "medium":
             st.markdown('<div class="risk-medium">', unsafe_allow_html=True)
-            st.markdown("#### 🟡 ความเสี่ยงปานกลาง - ควรติดตาม")
-            st.markdown(f"**Risk Score: {risk_score}/10**")
+            st.markdown("#### 🟡 ควรติดตามและปรึกษาแพทย์")
             st.markdown("""
             **คำแนะนำ:**
             - แนะนำให้พบแพทย์เพื่อประเมินเพิ่มเติม
@@ -317,8 +306,7 @@ with right:
             
         else:
             st.markdown('<div class="risk-low">', unsafe_allow_html=True)
-            st.markdown("#### 🟢 ความเสี่ยงต่ำ - อยู่ในเกณฑ์ปกติ")
-            st.markdown(f"**Risk Score: {risk_score}/10**")
+            st.markdown("#### 🟢 อยู่ในเกณฑ์ปกติ")
             st.markdown("""
             **คำแนะนำ:**
             - การเจริญเติบโตอยู่ในเกณฑ์ปกติ
