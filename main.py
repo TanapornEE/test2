@@ -1,7 +1,11 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime
+from PIL import Image
+import base64
+from io import BytesIO
 
 # ===================== PAGE CONFIG =====================
 st.set_page_config(
@@ -35,12 +39,19 @@ body {background-color: #f4f6fb;}
     text-align: center;
     margin: 10px 0;
 }
+.ai-result {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 15px 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ===================== HEADER =====================
-st.markdown('<div class="title">🩺 ระบบประเมินภาวะโตก่อนวัย</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Early Puberty Screening Assistant - ระบบประเมินเชิงวิชาการเบื้องต้น</div>', unsafe_allow_html=True)
+st.markdown('<div class="title">🩺 Early Puberty Screening System</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">AI-Powered Bone Age Assessment & Clinical Evaluation</div>', unsafe_allow_html=True)
 st.divider()
 
 # ===================== STANDARD DATA (Thai CDC) =====================
@@ -68,13 +79,13 @@ def calculate_height_percentile(age, height):
     p97 = interpolate_percentile(age, age_std, h_P97)
     
     if height < p3:
-        return "< P3 (ต่ำกว่ามาตรฐาน)"
+        return "< P3 (Below Standard)"
     elif height < p50:
-        return "P3-P50 (ปกติ)"
+        return "P3-P50 (Normal)"
     elif height < p97:
-        return "P50-P97 (ปกติ)"
+        return "P50-P97 (Normal)"
     else:
-        return "> P97 (สูงกว่ามาตรฐาน)"
+        return "> P97 (Above Standard)"
 
 def calculate_weight_percentile(age, weight):
     """Calculate which percentile the weight falls into"""
@@ -83,13 +94,13 @@ def calculate_weight_percentile(age, weight):
     p97 = interpolate_percentile(age, age_std, w_P97)
     
     if weight < p3:
-        return "< P3 (ต่ำกว่ามาตรฐาน)"
+        return "< P3 (Below Standard)"
     elif weight < p50:
-        return "P3-P50 (ปกติ)"
+        return "P3-P50 (Normal)"
     elif weight < p97:
-        return "P50-P97 (ปกติ)"
+        return "P50-P97 (Normal)"
     else:
-        return "> P97 (สูงกว่ามาตรฐาน)"
+        return "> P97 (Above Standard)"
 
 def calculate_bmi(weight, height_cm):
     """Calculate BMI"""
@@ -99,9 +110,9 @@ def calculate_bmi(weight, height_cm):
 def assess_risk_level(age, gender, secondary_signs, bone_age_diff):
     """Assess precocious puberty risk level based on clinical criteria"""
     # Age threshold for precocious puberty
-    if gender == "หญิง":
+    if gender == "Female":
         age_threshold = 8
-    else:  # ชาย
+    else:  # Male
         age_threshold = 9
     
     # Check criteria
@@ -118,77 +129,199 @@ def assess_risk_level(age, gender, secondary_signs, bone_age_diff):
     else:
         return "low"
 
+def create_tm_html(image_data):
+    """Create HTML with Teachable Machine model integration"""
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    </head>
+    <body>
+        <div id="result" style="font-family: Arial; padding: 20px;"></div>
+        <div id="label-container" style="font-family: Arial; padding: 10px;"></div>
+        
+        <script type="text/javascript">
+            const URL = "https://teachablemachine.withgoogle.com/models/AffepRuZp/";
+            let model, maxPredictions;
+
+            async function init() {{
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+
+                try {{
+                    model = await tmImage.load(modelURL, metadataURL);
+                    maxPredictions = model.getTotalClasses();
+                    
+                    document.getElementById("result").innerHTML = '<p style="color: green;">✅ Model loaded successfully!</p>';
+                    
+                    // Predict from base64 image
+                    await predict();
+                }} catch (error) {{
+                    document.getElementById("result").innerHTML = '<p style="color: red;">❌ Error loading model: ' + error.message + '</p>';
+                }}
+            }}
+
+            async function predict() {{
+                try {{
+                    // Create image element
+                    const img = new Image();
+                    img.src = "{image_data}";
+                    
+                    await img.decode();
+                    
+                    const prediction = await model.predict(img);
+                    
+                    let resultHTML = '<h3>🎯 AI Prediction Results:</h3>';
+                    let maxProb = 0;
+                    let maxClass = '';
+                    
+                    for (let i = 0; i < maxPredictions; i++) {{
+                        const className = prediction[i].className;
+                        const probability = (prediction[i].probability * 100).toFixed(2);
+                        
+                        if (prediction[i].probability > maxProb) {{
+                            maxProb = prediction[i].probability;
+                            maxClass = className;
+                        }}
+                        
+                        resultHTML += '<div style="margin: 10px 0; background: #f0f0f0; padding: 10px; border-radius: 5px;">';
+                        resultHTML += '<strong>' + className + ':</strong> ' + probability + '%';
+                        resultHTML += '<div style="background: #ddd; height: 20px; border-radius: 10px; margin-top: 5px;">';
+                        resultHTML += '<div style="background: linear-gradient(90deg, #667eea, #764ba2); width: ' + probability + '%; height: 100%; border-radius: 10px;"></div>';
+                        resultHTML += '</div></div>';
+                    }}
+                    
+                    resultHTML += '<div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 10px;">';
+                    resultHTML += '<h3>Predicted Class: ' + maxClass + '</h3>';
+                    resultHTML += '<p>Confidence: ' + (maxProb * 100).toFixed(2) + '%</p>';
+                    resultHTML += '</div>';
+                    
+                    document.getElementById("label-container").innerHTML = resultHTML;
+                    
+                    // Send results back to Streamlit
+                    window.parent.postMessage({{
+                        type: 'prediction',
+                        data: {{
+                            predictions: prediction,
+                            maxClass: maxClass,
+                            maxProb: maxProb
+                        }}
+                    }}, '*');
+                    
+                }} catch (error) {{
+                    document.getElementById("result").innerHTML = '<p style="color: red;">❌ Prediction error: ' + error.message + '</p>';
+                }}
+            }}
+
+            // Initialize on load
+            window.onload = init;
+        </script>
+    </body>
+    </html>
+    """
+    return html_code
+
 # ===================== LAYOUT =====================
 left, right = st.columns([1, 1.4])
 
 # ===================== INPUT SECTION =====================
 with left:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">📋 ข้อมูลพื้นฐาน</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">📋 Basic Information</div>', unsafe_allow_html=True)
     
-    gender = st.radio("เพศ", ["หญิง", "ชาย"], horizontal=True)
+    gender = st.radio("Gender", ["Female", "Male"], horizontal=True)
     
     col1, col2 = st.columns(2)
     with col1:
-        age = st.number_input("อายุ (ปี)", 2.0, 19.0, 8.5, step=0.1)
+        age = st.number_input("Age (years)", 2.0, 19.0, 8.5, step=0.1)
     with col2:
-        birth_date = st.date_input("วันเกิด (ถ้าทราบ)", 
+        birth_date = st.date_input("Birth Date (if known)", 
                                    value=datetime(2015, 1, 1),
                                    max_value=datetime.now())
     
-    height = st.number_input("ส่วนสูง (cm)", 50.0, 200.0, 130.0, step=0.1)
-    weight = st.number_input("น้ำหนัก (kg)", 2.0, 120.0, 35.0, step=0.1)
+    height = st.number_input("Height (cm)", 50.0, 200.0, 130.0, step=0.1)
+    weight = st.number_input("Weight (kg)", 2.0, 120.0, 35.0, step=0.1)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Secondary sexual characteristics
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">🔬 ลักษณะทางเพศทุติยภูมิ</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">🔬 Secondary Sexual Characteristics</div>', unsafe_allow_html=True)
     
-    if gender == "หญิง":
-        breast = st.checkbox("📍 มีการพัฒนาของเต้านม (Breast Development)")
-        pubic_hair = st.checkbox("📍 มีขนบริเวณอวัยวะเพศ (Pubic Hair)")
-        axillary_hair = st.checkbox("📍 มีขนรักแร้ (Axillary Hair)")
-        menarche = st.checkbox("📍 มีประจำเดือนแล้ว (Menarche)")
-        body_odor = st.checkbox("📍 มีกลิ่นตัว (Body Odor)")
+    if gender == "Female":
+        breast = st.checkbox("📍 Breast Development")
+        pubic_hair = st.checkbox("📍 Pubic Hair")
+        axillary_hair = st.checkbox("📍 Axillary Hair")
+        menarche = st.checkbox("📍 Menarche (First Period)")
+        body_odor = st.checkbox("📍 Body Odor")
         
         secondary_count = sum([breast, pubic_hair, axillary_hair, menarche, body_odor])
     else:
-        testicular = st.checkbox("📍 อัณฑะโตขึ้น (Testicular Enlargement)")
-        penile = st.checkbox("📍 องคชาตโตขึ้น (Penile Growth)")
-        pubic_hair = st.checkbox("📍 มีขนบริเวณอวัยวะเพศ (Pubic Hair)")
-        facial_hair = st.checkbox("📍 มีขนหน้า (Facial Hair)")
-        voice_change = st.checkbox("📍 เสียงแตก (Voice Change)")
-        body_odor = st.checkbox("📍 มีกลิ่นตัว (Body Odor)")
+        testicular = st.checkbox("📍 Testicular Enlargement")
+        penile = st.checkbox("📍 Penile Growth")
+        pubic_hair = st.checkbox("📍 Pubic Hair")
+        facial_hair = st.checkbox("📍 Facial Hair")
+        voice_change = st.checkbox("📍 Voice Change")
+        body_odor = st.checkbox("📍 Body Odor")
         
         secondary_count = sum([testicular, penile, pubic_hair, facial_hair, voice_change, body_odor])
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Additional information
+    # Additional information with AI
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">🦴 ข้อมูลเพิ่มเติม</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">🤖 AI X-ray Analysis</div>', unsafe_allow_html=True)
     
-    bone_age_known = st.checkbox("ทราบ Bone Age จากการตรวจ X-ray")
+    st.info("📸 Upload hand/wrist X-ray for AI-powered bone age assessment")
+    xray = st.file_uploader("Upload X-ray Image", type=["jpg", "png", "jpeg"], key="xray_upload")
+    
+    ai_component_html = None
+    
+    if xray:
+        image = Image.open(xray)
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+            
+        st.image(image, width=280, caption="X-ray Image")
+        
+        if st.button("🔍 Analyze with AI", use_container_width=True):
+            # Convert image to base64
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            image_data = f"data:image/jpeg;base64,{img_str}"
+            
+            # Create HTML component with Teachable Machine
+            ai_component_html = create_tm_html(image_data)
+    
+    st.markdown("---")
+    
+    bone_age_known = st.checkbox("Or manually enter Bone Age")
     if bone_age_known:
-        bone_age = st.number_input("Bone Age (ปี)", 2.0, 19.0, age, step=0.1)
+        bone_age = st.number_input("Bone Age (years)", 2.0, 19.0, age, step=0.1)
     else:
         bone_age = age + (0.5 if secondary_count >= 2 else 0)
     
-    xray = st.file_uploader("📷 อัพโหลดภาพ X-ray ข้อมือ (ถ้ามี)", type=["jpg", "png", "jpeg"])
-    if xray:
-        st.image(xray, width=280, caption="X-ray Image")
-    
-    family_history = st.checkbox("ประวัติครอบครัวมีภาวะโตก่อนวัย")
+    family_history = st.checkbox("Family History of Precocious Puberty")
     
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ===================== AI COMPONENT DISPLAY =====================
+if ai_component_html:
+    st.markdown("---")
+    st.markdown("### 🤖 AI Model Analysis")
+    components.html(ai_component_html, height=600, scrolling=True)
 
 # ===================== RESULT SECTION =====================
 with right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">📊 ผลการประเมินและวิเคราะห์</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">📊 Assessment Results & Analysis</div>', unsafe_allow_html=True)
     
-    if st.button("🔍 ประเมินผล", use_container_width=True, type="primary"):
+    if st.button("🔍 Generate Report", use_container_width=True, type="primary"):
         
         # Calculate metrics
         bmi = calculate_bmi(weight, height)
@@ -203,7 +336,7 @@ with right:
         with col2:
             st.markdown(f'<div class="metric-box"><h3>{bone_age:.1f}</h3><p>Bone Age</p></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="metric-box"><h3>{secondary_count}</h3><p>ลักษณะทุติยภูมิ</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-box"><h3>{secondary_count}</h3><p>Signs Present</p></div>', unsafe_allow_html=True)
         
         st.divider()
         
@@ -251,77 +384,85 @@ with right:
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=9, loc="upper left", framealpha=0.9)
         
-        plt.title(f"Growth Chart - {gender} อายุ {age:.1f} ปี", fontsize=14, fontweight='bold', pad=20)
+        plt.title(f"Growth Chart - {gender}, Age {age:.1f} years", fontsize=14, fontweight='bold', pad=20)
         st.pyplot(fig)
         
         st.divider()
         
         # -------- DETAILED ANALYSIS --------
-        st.markdown("### 🧠 การวิเคราะห์โดยละเอียด")
+        st.markdown("### 🧠 Detailed Analysis")
         
         st.markdown(f"""
-        **📏 ข้อมูลการเจริญเติบโต:**
-        - ส่วนสูง: {height:.1f} cm ({height_perc})
-        - น้ำหนัก: {weight:.1f} kg ({weight_perc})
+        **📏 Growth Parameters:**
+        - Height: {height:.1f} cm ({height_perc})
+        - Weight: {weight:.1f} kg ({weight_perc})
         - BMI: {bmi:.1f} kg/m²
         
-        **🦴 ข้อมูล Bone Age:**
-        - อายุจริง: {age:.1f} ปี
-        - Bone Age: {bone_age:.1f} ปี
-        - ความแตกต่าง: {bone_age_diff:+.1f} ปี
+        **🦴 Bone Age Assessment:**
+        - Chronological Age: {age:.1f} years
+        - Bone Age: {bone_age:.1f} years
+        - Difference: {bone_age_diff:+.1f} years
         
-        **🔬 ลักษณะทางเพศทุติยภูมิ:**
-        - พบลักษณะ: {secondary_count} ข้อ
-        - ประวัติครอบครัว: {"มี" if family_history else "ไม่มี"}
+        **🔬 Sexual Development:**
+        - Signs Present: {secondary_count} characteristics
+        - Family History: {"Yes" if family_history else "No"}
         """)
         
         # -------- RISK ASSESSMENT --------
         risk_level = assess_risk_level(age, gender, secondary_count, bone_age_diff)
         
-        st.markdown("### ⚕️ สรุปผลการประเมิน")
+        st.markdown("### ⚕️ Clinical Risk Assessment")
         
         if risk_level == "high":
             st.markdown('<div class="risk-high">', unsafe_allow_html=True)
-            st.markdown("#### 🔴 มีความเสี่ยงภาวะโตก่อนวัย")
+            st.markdown("#### 🔴 High Risk - Medical Consultation Required")
             st.markdown("""
-            **คำแนะนำ:**
-            - ควรพบแพทย์เฉพาะทาง (กุมารเวชศาสตร์ต่อมไร้ท่อ) โดยเร็ว
-            - อาจต้องตรวจเพิ่มเติม: Bone Age X-ray, Hormone Level, Brain MRI
-            - ติดตามการเจริญเติบโตอย่างใกล้ชิด
-            - พิจารณาการรักษาเพื่อชะลอพัฒนาการ
+            **Recommendations:**
+            - Urgent consultation with Pediatric Endocrinologist recommended
+            - Comprehensive evaluation needed:
+              - Bone Age X-ray (if not done)
+              - Hormone Levels (LH, FSH, Estradiol/Testosterone)
+              - Brain MRI (if indicated)
+            - Close growth monitoring required
+            - Consider GnRH analogue therapy to delay development
+            - Early intervention can prevent complications
             """)
             st.markdown('</div>', unsafe_allow_html=True)
             
         elif risk_level == "medium":
             st.markdown('<div class="risk-medium">', unsafe_allow_html=True)
-            st.markdown("#### 🟡 ควรติดตามและปรึกษาแพทย์")
+            st.markdown("#### 🟡 Moderate Risk - Follow-up Recommended")
             st.markdown("""
-            **คำแนะนำ:**
-            - แนะนำให้พบแพทย์เพื่อประเมินเพิ่มเติม
-            - ติดตามการเจริญเติบโตทุก 3-6 เดือน
-            - สังเกตพัฒนาการทางเพศทุติยภูมิ
-            - บันทึกการเปลี่ยนแปลงอย่างสม่ำเสมอ
+            **Recommendations:**
+            - Schedule evaluation with Pediatric Endocrinologist
+            - Monitor growth every 3-6 months
+            - Track development of secondary sexual characteristics
+            - Document changes systematically
+            - Consider Bone Age X-ray for accurate assessment
+            - Re-evaluate if progression continues
             """)
             st.markdown('</div>', unsafe_allow_html=True)
             
         else:
             st.markdown('<div class="risk-low">', unsafe_allow_html=True)
-            st.markdown("#### 🟢 อยู่ในเกณฑ์ปกติ")
+            st.markdown("#### 🟢 Low Risk - Normal Development")
             st.markdown("""
-            **คำแนะนำ:**
-            - การเจริญเติบโตอยู่ในเกณฑ์ปกติ
-            - ติดตามการเจริญเติบโตตามปกติ
-            - ตรวจสุขภาพประจำปีตามกำหนด
-            - หากมีการเปลี่ยนแปลงผิดปกติ ควรปรึกษาแพทย์
+            **Recommendations:**
+            - Growth and development within normal parameters
+            - Continue routine growth monitoring
+            - Regular annual health check-ups
+            - Consult physician if unusual changes occur
+            - Maintain healthy lifestyle habits
             """)
             st.markdown('</div>', unsafe_allow_html=True)
         
         st.divider()
         
         # Warning and disclaimer
-        st.warning("⚠️ **คำเตือนสำคัญ:** ระบบนี้เป็นเครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่สามารถใช้แทนการวินิจฉัยของแพทย์ได้ ควรปรึกษาแพทย์เฉพาะทางเพื่อการตรวจวินิจฉัยที่แม่นยำ")
+        st.warning("⚠️ **Important Notice:** This system is a screening tool for educational purposes only. AI assessment provides preliminary analysis and cannot replace professional medical diagnosis. Always consult qualified healthcare professionals for accurate diagnosis and treatment planning.")
         
-        st.info("💡 **หมายเหตุ:** การประเมิน Bone Age ที่ไม่ได้มาจาก X-ray เป็นเพียงการประมาณการเบื้องต้นเท่านั้น ควรตรวจ X-ray ข้อมือจริงเพื่อความแม่นยำ")
+        if not bone_age_known and not xray:
+            st.info("💡 **Note:** Bone Age estimation without X-ray is approximate. For accurate assessment, hand/wrist X-ray evaluation is recommended.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -329,8 +470,10 @@ with right:
 st.divider()
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
-    <p><strong>Early Puberty Screening System v2.0</strong></p>
-    <p>ระบบประเมินภาวะโตก่อนวัยเบื้องต้น | เพื่อการศึกษาและคัดกรองเท่านั้น</p>
-    <p style='font-size: 12px;'>📚 อ้างอิง: Thai CDC Growth Chart, WHO Standards, Pediatric Endocrinology Guidelines</p>
+    <p><strong>Early Puberty Screening System v3.0 AI-Powered</strong></p>
+    <p>Clinical Decision Support Tool | Educational & Screening Purposes Only</p>
+    <p style='font-size: 12px;'>📚 References: Thai CDC Growth Charts, WHO Standards, Pediatric Endocrinology Guidelines</p>
+    <p style='font-size: 12px;'>🤖 AI Technology: Teachable Machine by Google</p>
+    <p style='font-size: 11px; margin-top: 10px;'>Developed for medical education and preliminary screening. Not FDA approved for clinical diagnosis.</p>
 </div>
 """, unsafe_allow_html=True)
