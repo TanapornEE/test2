@@ -10,8 +10,8 @@ from io import BytesIO
 
 # ===================== PAGE CONFIG =====================
 st.set_page_config(
-    page_title="Early Puberty Screening System",
-    page_icon="🩺",
+    page_title="BONESAGE CHATBOT - AI Bone Age Assessment",
+    page_icon="🦴",
     layout="wide"
 )
 
@@ -27,18 +27,70 @@ body {background-color: #f4f6fb;}
     border-radius: 16px;
     box-shadow: 0px 4px 14px rgba(0,0,0,0.08);
     margin-bottom: 20px;
+    border-left: 5px solid #667eea;
 }
-.section {font-size: 22px; font-weight: 600; margin-bottom: 10px; color: #1e40af;}
-.risk-high {background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;}
-.risk-medium {background-color: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;}
-.risk-low {background-color: #d1fae5; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;}
+.card-demographics {
+    background: linear-gradient(135deg, #ffeef8 0%, #fff5f7 100%);
+    border-left: 5px solid #ec4899;
+}
+.card-sexual {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-left: 5px solid #0ea5e9;
+}
+.card-ai {
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    border-left: 5px solid #8b5cf6;
+}
+.card-results {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border-left: 5px solid #10b981;
+}
+.section {
+    font-size: 22px; 
+    font-weight: 700; 
+    margin-bottom: 15px; 
+    color: #1e40af;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.section-icon {
+    font-size: 28px;
+}
+.risk-high {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 6px solid #dc2626;
+    box-shadow: 0 4px 6px rgba(220, 38, 38, 0.1);
+}
+.risk-medium {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 6px solid #f59e0b;
+    box-shadow: 0 4px 6px rgba(245, 158, 11, 0.1);
+}
+.risk-low {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 6px solid #10b981;
+    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.1);
+}
 .metric-box {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 15px;
-    border-radius: 10px;
+    padding: 20px;
+    border-radius: 12px;
     text-align: center;
     margin: 10px 0;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transition: transform 0.2s;
+}
+.metric-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
 }
 .ai-result {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -50,27 +102,50 @@ body {background-color: #f4f6fb;}
 .age-display {
     background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     color: white;
-    padding: 15px;
-    border-radius: 10px;
+    padding: 18px;
+    border-radius: 12px;
     text-align: center;
     font-size: 24px;
     font-weight: bold;
     margin: 15px 0;
+    box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
 }
 .ai-instruction {
-    background-color: #e0f2fe;
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+    padding: 18px;
+    border-radius: 12px;
+    border-left: 5px solid #0284c7;
+    margin: 10px 0;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
+}
+.input-section {
+    background: white;
     padding: 15px;
     border-radius: 10px;
-    border-left: 4px solid #0284c7;
     margin: 10px 0;
+    border: 2px solid #e5e7eb;
+}
+.divider-colorful {
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    border: none;
+    margin: 20px 0;
+    border-radius: 2px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ===================== HEADER =====================
-st.markdown('<div class="title">🩺 Early Puberty Screening System</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">AI-Powered Bone Age Assessment & Clinical Evaluation</div>', unsafe_allow_html=True)
-st.divider()
+st.markdown("""
+<div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-bottom: 30px;">
+    <h1 style="color: white; font-size: 48px; margin: 0; font-weight: 800;">
+        🦴 BONESAGE CHATBOT
+    </h1>
+    <p style="color: #e0e7ff; font-size: 18px; margin-top: 10px; font-weight: 500;">
+        AI-Powered Bone Age Assessment & Clinical Evaluation
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ===================== STANDARD DATA (Thai CDC) =====================
 age_std = [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
@@ -328,10 +403,10 @@ left, right = st.columns([1, 1.4])
 
 # ===================== INPUT SECTION =====================
 with left:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">📋 Patient Demographics</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card card-demographics">', unsafe_allow_html=True)
+    st.markdown('<div class="section"><span class="section-icon">👤</span> Patient Demographics</div>', unsafe_allow_html=True)
     
-    gender = st.radio("Gender", ["Female", "Male"], horizontal=True)
+    gender = st.radio("**Gender**", ["Female", "Male"], horizontal=True)
     
     # Birth date input
     birth_date = st.date_input(
@@ -353,17 +428,19 @@ with left:
     # Use calculated age
     age = st.session_state.calculated_age if st.session_state.calculated_age else 8.5
     
-    st.markdown("**Current Measurements:**")
+    st.markdown('<div class="input-section">', unsafe_allow_html=True)
+    st.markdown("**📏 Current Measurements:**")
     col1, col2 = st.columns(2)
     with col1:
         height = st.number_input("Height (cm)", 50.0, 200.0, 130.0, step=0.1, key="current_height")
     with col2:
         weight = st.number_input("Weight (kg)", 2.0, 120.0, 35.0, step=0.1, key="current_weight")
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown("---")
-    st.markdown("**6-Month Previous Measurements:** (for Growth Velocity Assessment)")
+    st.markdown('<div class="input-section">', unsafe_allow_html=True)
+    st.markdown("**📊 6-Month Previous Measurements** (for Growth Velocity Assessment)")
     
-    has_previous = st.checkbox("📊 I have measurements from 6 months ago")
+    has_previous = st.checkbox("✅ I have measurements from 6 months ago")
     
     if has_previous:
         col3, col4 = st.columns(2)
@@ -378,8 +455,8 @@ with left:
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Secondary sexual characteristics
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">🔬 Secondary Sexual Characteristics</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card card-sexual">', unsafe_allow_html=True)
+    st.markdown('<div class="section"><span class="section-icon">🔬</span> Secondary Sexual Characteristics</div>', unsafe_allow_html=True)
     
     # Use same characteristics for both genders (female pattern)
     pubic_hair = st.checkbox("📍 Pubarche (Pubic Hair Development)")
@@ -399,16 +476,18 @@ with left:
     st.markdown('</div>', unsafe_allow_html=True)
     
     # AI X-ray Analysis
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">🤖 AI Bone Age Assessment</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card card-ai">', unsafe_allow_html=True)
+    st.markdown('<div class="section"><span class="section-icon">🤖</span> AI Bone Age Assessment</div>', unsafe_allow_html=True)
     
     st.markdown("""
     <div class="ai-instruction">
-        <strong>📸 Instructions:</strong><br>
-        1. Upload hand/wrist X-ray (AP view preferred)<br>
-        2. Click "Analyze with AI" button<br>
-        3. Wait for analysis (approximately 3-5 seconds)<br>
-        4. Review bone age assessment results
+        <strong style="font-size: 16px; color: #0c4a6e;">📸 Instructions for Best Results:</strong><br>
+        <ul style="margin-top: 10px; color: #164e63;">
+            <li><strong>Step 1:</strong> Upload hand/wrist X-ray (AP view preferred)</li>
+            <li><strong>Step 2:</strong> Click "Analyze with AI" button</li>
+            <li><strong>Step 3:</strong> Wait for analysis (approximately 3-5 seconds)</li>
+            <li><strong>Step 4:</strong> Review bone age assessment results</li>
+        </ul>
     </div>
     """, unsafe_allow_html=True)
     
@@ -453,14 +532,18 @@ with left:
 
 # ===================== AI COMPONENT DISPLAY =====================
 if show_ai_analysis and ai_component_html:
-    st.markdown("---")
-    st.markdown("### 🤖 AI Analysis Results")
+    st.markdown('<hr class="divider-colorful">', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border-radius: 12px; margin: 20px 0;">
+        <h3 style="color: #6d28d9; margin: 0;">🤖 AI Analysis Results</h3>
+    </div>
+    """, unsafe_allow_html=True)
     components.html(ai_component_html, height=700, scrolling=True)
 
 # ===================== RESULT SECTION =====================
 with right:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">📊 Clinical Assessment Results</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card card-results">', unsafe_allow_html=True)
+    st.markdown('<div class="section"><span class="section-icon">📊</span> Clinical Assessment Results</div>', unsafe_allow_html=True)
     
     if st.button("🔍 Generate Clinical Report", use_container_width=True, type="primary"):
         
@@ -781,14 +864,25 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ===================== FOOTER =====================
-st.divider()
+st.markdown('<hr class="divider-colorful">', unsafe_allow_html=True)
 st.markdown("""
-<div style='text-align: center; color: #666; padding: 20px;'>
-    <p><strong>Early Puberty Screening System v3.1 AI-Enhanced</strong></p>
-    <p>Clinical Decision Support Tool | Educational & Screening Purposes Only</p>
-    <p style='font-size: 12px;'>📚 References: Thai CDC Growth Charts, WHO Growth Standards, Pediatric Endocrinology Clinical Guidelines</p>
-    <p style='font-size: 12px;'>🤖 AI Technology: Teachable Machine by Google (TensorFlow.js)</p>
-    <p style='font-size: 11px; margin-top: 10px;'>Developed for medical education and preliminary screening. Not FDA approved for clinical diagnosis.<br>
-    Always consult board-certified pediatric endocrinologists for definitive diagnosis and treatment.</p>
+<div style='text-align: center; padding: 25px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 15px;'>
+    <p style="margin: 0;"><strong style="font-size: 20px; color: #1e293b;">🦴 BONESAGE CHATBOT v3.2</strong></p>
+    <p style="color: #475569; margin: 10px 0; font-size: 15px;">Clinical Decision Support Tool | Educational & Screening Purposes Only</p>
+    <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+        <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px;">
+            📚 Thai CDC Growth Charts
+        </span>
+        <span style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px;">
+            🌍 WHO Standards
+        </span>
+        <span style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px;">
+            🤖 TensorFlow.js AI
+        </span>
+    </div>
+    <p style='font-size: 11px; margin-top: 15px; color: #64748b;'>
+        Developed for medical education and preliminary screening. Not FDA approved for clinical diagnosis.<br>
+        Always consult board-certified pediatric endocrinologists for definitive diagnosis and treatment.
+    </p>
 </div>
 """, unsafe_allow_html=True)
