@@ -2,7 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 import numpy as np
-from datetime import datetime
+from datetime import datetime, date
+from dateutil.relativedelta import relativedelta
 from PIL import Image
 import base64
 from io import BytesIO
@@ -46,6 +47,23 @@ body {background-color: #f4f6fb;}
     border-radius: 12px;
     margin: 15px 0;
 }
+.age-display {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 15px 0;
+}
+.ai-instruction {
+    background-color: #e0f2fe;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 4px solid #0284c7;
+    margin: 10px 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -68,6 +86,13 @@ w_P50 = [12,14,16,18,20,22,25,28,32,36,41,47,52,55,57,58,59,60]
 w_P97 = [14,17,20,23,26,30,35,40,45,50,58,65,72,78,82,85,87,90]
 
 # ===================== HELPER FUNCTIONS =====================
+def calculate_age(birth_date):
+    """Calculate age from birth date in years with decimal"""
+    today = date.today()
+    delta = relativedelta(today, birth_date)
+    age_years = delta.years + delta.months / 12 + delta.days / 365.25
+    return age_years, f"{delta.years} years {delta.months} months {delta.days} days"
+
 def interpolate_percentile(age, age_list, value_list):
     """Interpolate percentile values for exact age"""
     return np.interp(age, age_list, value_list)
@@ -137,10 +162,71 @@ def create_tm_html(image_data):
     <head>
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+        <style>
+            body {{
+                font-family: 'Arial', sans-serif;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }}
+            .container {{
+                background: white;
+                padding: 25px;
+                border-radius: 15px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            }}
+            .status {{
+                padding: 12px;
+                border-radius: 8px;
+                margin: 10px 0;
+                font-weight: bold;
+            }}
+            .success {{ background-color: #d1fae5; color: #065f46; }}
+            .error {{ background-color: #fee2e2; color: #991b1b; }}
+            .loading {{ background-color: #dbeafe; color: #1e40af; }}
+            .prediction-item {{
+                margin: 12px 0;
+                background: #f9fafb;
+                padding: 15px;
+                border-radius: 10px;
+                border-left: 4px solid #667eea;
+            }}
+            .progress-bar {{
+                background: #e5e7eb;
+                height: 24px;
+                border-radius: 12px;
+                margin-top: 8px;
+                overflow: hidden;
+            }}
+            .progress-fill {{
+                height: 100%;
+                background: linear-gradient(90deg, #667eea, #764ba2);
+                border-radius: 12px;
+                transition: width 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            .final-result {{
+                margin-top: 20px;
+                padding: 20px;
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                color: white;
+                border-radius: 12px;
+                text-align: center;
+            }}
+            h2 {{ color: #1e40af; margin-top: 0; }}
+            h3 {{ color: #4f46e5; margin: 5px 0; }}
+        </style>
     </head>
     <body>
-        <div id="result" style="font-family: Arial; padding: 20px;"></div>
-        <div id="label-container" style="font-family: Arial; padding: 10px;"></div>
+        <div class="container">
+            <h2>🤖 AI X-ray Image Analysis</h2>
+            <div id="status" class="status loading">⏳ Loading AI Model...</div>
+            <div id="result"></div>
+        </div>
         
         <script type="text/javascript">
             const URL = "https://teachablemachine.withgoogle.com/models/AffepRuZp/";
@@ -154,18 +240,18 @@ def create_tm_html(image_data):
                     model = await tmImage.load(modelURL, metadataURL);
                     maxPredictions = model.getTotalClasses();
                     
-                    document.getElementById("result").innerHTML = '<p style="color: green;">✅ Model loaded successfully!</p>';
+                    document.getElementById("status").className = "status success";
+                    document.getElementById("status").innerHTML = '✅ AI Model Loaded Successfully! Analyzing Image...';
                     
-                    // Predict from base64 image
                     await predict();
                 }} catch (error) {{
-                    document.getElementById("result").innerHTML = '<p style="color: red;">❌ Error loading model: ' + error.message + '</p>';
+                    document.getElementById("status").className = "status error";
+                    document.getElementById("status").innerHTML = '❌ Model Loading Error: ' + error.message;
                 }}
             }}
 
             async function predict() {{
                 try {{
-                    // Create image element
                     const img = new Image();
                     img.src = "{image_data}";
                     
@@ -173,34 +259,42 @@ def create_tm_html(image_data):
                     
                     const prediction = await model.predict(img);
                     
-                    let resultHTML = '<h3>🎯 AI Prediction Results:</h3>';
+                    let resultHTML = '<h2>🎯 AI Analysis Results:</h2>';
                     let maxProb = 0;
                     let maxClass = '';
                     
                     for (let i = 0; i < maxPredictions; i++) {{
                         const className = prediction[i].className;
-                        const probability = (prediction[i].probability * 100).toFixed(2);
+                        const probability = (prediction[i].probability * 100).toFixed(1);
                         
                         if (prediction[i].probability > maxProb) {{
                             maxProb = prediction[i].probability;
                             maxClass = className;
                         }}
                         
-                        resultHTML += '<div style="margin: 10px 0; background: #f0f0f0; padding: 10px; border-radius: 5px;">';
-                        resultHTML += '<strong>' + className + ':</strong> ' + probability + '%';
-                        resultHTML += '<div style="background: #ddd; height: 20px; border-radius: 10px; margin-top: 5px;">';
-                        resultHTML += '<div style="background: linear-gradient(90deg, #667eea, #764ba2); width: ' + probability + '%; height: 100%; border-radius: 10px;"></div>';
-                        resultHTML += '</div></div>';
+                        resultHTML += '<div class="prediction-item">';
+                        resultHTML += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                        resultHTML += '<strong style="font-size: 16px;">📊 ' + className + '</strong>';
+                        resultHTML += '<span style="font-size: 18px; font-weight: bold; color: #667eea;">' + probability + '%</span>';
+                        resultHTML += '</div>';
+                        resultHTML += '<div class="progress-bar">';
+                        resultHTML += '<div class="progress-fill" style="width: ' + probability + '%;">';
+                        if (parseFloat(probability) > 20) {{
+                            resultHTML += probability + '%';
+                        }}
+                        resultHTML += '</div></div></div>';
                     }}
                     
-                    resultHTML += '<div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 10px;">';
-                    resultHTML += '<h3>Predicted Class: ' + maxClass + '</h3>';
-                    resultHTML += '<p>Confidence: ' + (maxProb * 100).toFixed(2) + '%</p>';
+                    resultHTML += '<div class="final-result">';
+                    resultHTML += '<h3>🏆 Predicted Classification</h3>';
+                    resultHTML += '<h2 style="margin: 10px 0; color: white;">' + maxClass + '</h2>';
+                    resultHTML += '<p style="font-size: 18px; margin: 5px 0;">Confidence Level: ' + (maxProb * 100).toFixed(1) + '%</p>';
                     resultHTML += '</div>';
                     
-                    document.getElementById("label-container").innerHTML = resultHTML;
+                    document.getElementById("result").innerHTML = resultHTML;
+                    document.getElementById("status").className = "status success";
+                    document.getElementById("status").innerHTML = '✅ Analysis Complete!';
                     
-                    // Send results back to Streamlit
                     window.parent.postMessage({{
                         type: 'prediction',
                         data: {{
@@ -211,11 +305,11 @@ def create_tm_html(image_data):
                     }}, '*');
                     
                 }} catch (error) {{
-                    document.getElementById("result").innerHTML = '<p style="color: red;">❌ Prediction error: ' + error.message + '</p>';
+                    document.getElementById("status").className = "status error";
+                    document.getElementById("status").innerHTML = '❌ Analysis Error: ' + error.message;
                 }}
             }}
 
-            // Initialize on load
             window.onload = init;
         </script>
     </body>
@@ -223,23 +317,41 @@ def create_tm_html(image_data):
     """
     return html_code
 
+# ===================== INITIALIZE SESSION STATE =====================
+if 'calculated_age' not in st.session_state:
+    st.session_state.calculated_age = None
+if 'age_text' not in st.session_state:
+    st.session_state.age_text = None
+
 # ===================== LAYOUT =====================
 left, right = st.columns([1, 1.4])
 
 # ===================== INPUT SECTION =====================
 with left:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">📋 Basic Information</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">📋 Patient Demographics</div>', unsafe_allow_html=True)
     
     gender = st.radio("Gender", ["Female", "Male"], horizontal=True)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        age = st.number_input("Age (years)", 2.0, 19.0, 8.5, step=0.1)
-    with col2:
-        birth_date = st.date_input("Birth Date (if known)", 
-                                   value=datetime(2015, 1, 1),
-                                   max_value=datetime.now())
+    # Birth date input
+    birth_date = st.date_input(
+        "📅 Date of Birth", 
+        value=datetime(2015, 6, 1),
+        min_value=datetime(2005, 1, 1),
+        max_value=datetime.now()
+    )
+    
+    # Calculate age automatically
+    if birth_date:
+        age_years, age_text = calculate_age(birth_date)
+        st.session_state.calculated_age = age_years
+        st.session_state.age_text = age_text
+        
+        st.markdown(f'<div class="age-display">🎂 Chronological Age: {age_text}<br>({age_years:.1f} years)</div>', 
+                   unsafe_allow_html=True)
+    
+    # Use calculated age
+    age = st.session_state.calculated_age if st.session_state.calculated_age else 8.5
     
     height = st.number_input("Height (cm)", 50.0, 200.0, 130.0, step=0.1)
     weight = st.number_input("Weight (kg)", 2.0, 120.0, 35.0, step=0.1)
@@ -250,78 +362,88 @@ with left:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="section">🔬 Secondary Sexual Characteristics</div>', unsafe_allow_html=True)
     
+    # Use same characteristics for both genders (female pattern)
+    pubic_hair = st.checkbox("📍 Pubarche (Pubic Hair Development)")
+    axillary_hair = st.checkbox("📍 Axillary Hair")
+    body_odor = st.checkbox("📍 Apocrine Body Odor")
+    
     if gender == "Female":
-        breast = st.checkbox("📍 Breast Development")
-        pubic_hair = st.checkbox("📍 Pubic Hair")
-        axillary_hair = st.checkbox("📍 Axillary Hair")
-        menarche = st.checkbox("📍 Menarche (First Period)")
-        body_odor = st.checkbox("📍 Body Odor")
-        
-        secondary_count = sum([breast, pubic_hair, axillary_hair, menarche, body_odor])
+        breast = st.checkbox("📍 Thelarche (Breast Development)")
+        menarche = st.checkbox("📍 Menarche (First Menstruation)")
+        secondary_count = sum([pubic_hair, axillary_hair, body_odor, breast, menarche])
     else:
-        testicular = st.checkbox("📍 Testicular Enlargement")
-        penile = st.checkbox("📍 Penile Growth")
-        pubic_hair = st.checkbox("📍 Pubic Hair")
-        facial_hair = st.checkbox("📍 Facial Hair")
-        voice_change = st.checkbox("📍 Voice Change")
-        body_odor = st.checkbox("📍 Body Odor")
-        
-        secondary_count = sum([testicular, penile, pubic_hair, facial_hair, voice_change, body_odor])
+        # For males, still show these options but without breast/menarche
+        breast = False
+        menarche = False
+        secondary_count = sum([pubic_hair, axillary_hair, body_odor])
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Additional information with AI
+    # AI X-ray Analysis
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">🤖 AI X-ray Analysis</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">🤖 AI Bone Age Assessment</div>', unsafe_allow_html=True)
     
-    st.info("📸 Upload hand/wrist X-ray for AI-powered bone age assessment")
-    xray = st.file_uploader("Upload X-ray Image", type=["jpg", "png", "jpeg"], key="xray_upload")
+    st.markdown("""
+    <div class="ai-instruction">
+        <strong>📸 Instructions:</strong><br>
+        1. Upload hand/wrist X-ray (AP view preferred)<br>
+        2. Click "Analyze with AI" button<br>
+        3. Wait for analysis (approximately 3-5 seconds)<br>
+        4. Review bone age assessment results
+    </div>
+    """, unsafe_allow_html=True)
+    
+    xray = st.file_uploader("📤 Upload X-ray Image", type=["jpg", "png", "jpeg"], key="xray_upload")
     
     ai_component_html = None
+    show_ai_analysis = False
     
     if xray:
         image = Image.open(xray)
         
-        # Convert to RGB if necessary
         if image.mode != 'RGB':
             image = image.convert('RGB')
             
-        st.image(image, width=280, caption="X-ray Image")
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.image(image, caption="Uploaded X-ray Image", use_container_width=True)
         
-        if st.button("🔍 Analyze with AI", use_container_width=True):
-            # Convert image to base64
-            buffered = BytesIO()
-            image.save(buffered, format="JPEG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            image_data = f"data:image/jpeg;base64,{img_str}"
-            
-            # Create HTML component with Teachable Machine
-            ai_component_html = create_tm_html(image_data)
+        with col2:
+            if st.button("🔍 Analyze with AI", use_container_width=True, type="primary"):
+                show_ai_analysis = True
+                
+                # Convert image to base64
+                buffered = BytesIO()
+                image.save(buffered, format="JPEG")
+                img_str = base64.b64encode(buffered.getvalue()).decode()
+                image_data = f"data:image/jpeg;base64,{img_str}"
+                
+                ai_component_html = create_tm_html(image_data)
     
     st.markdown("---")
     
-    bone_age_known = st.checkbox("Or manually enter Bone Age")
+    bone_age_known = st.checkbox("💡 Manual Bone Age Entry (if radiologist assessment available)")
     if bone_age_known:
         bone_age = st.number_input("Bone Age (years)", 2.0, 19.0, age, step=0.1)
     else:
         bone_age = age + (0.5 if secondary_count >= 2 else 0)
     
-    family_history = st.checkbox("Family History of Precocious Puberty")
+    family_history = st.checkbox("👨‍👩‍👧‍👦 Family History of Precocious Puberty")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ===================== AI COMPONENT DISPLAY =====================
-if ai_component_html:
+if show_ai_analysis and ai_component_html:
     st.markdown("---")
-    st.markdown("### 🤖 AI Model Analysis")
-    components.html(ai_component_html, height=600, scrolling=True)
+    st.markdown("### 🤖 AI Analysis Results")
+    components.html(ai_component_html, height=700, scrolling=True)
 
 # ===================== RESULT SECTION =====================
 with right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section">📊 Assessment Results & Analysis</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">📊 Clinical Assessment Results</div>', unsafe_allow_html=True)
     
-    if st.button("🔍 Generate Report", use_container_width=True, type="primary"):
+    if st.button("🔍 Generate Clinical Report", use_container_width=True, type="primary"):
         
         # Calculate metrics
         bmi = calculate_bmi(weight, height)
@@ -332,15 +454,15 @@ with right:
         # Display metrics
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f'<div class="metric-box"><h3>{bmi:.1f}</h3><p>BMI</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-box"><h3>{bmi:.1f}</h3><p>BMI (kg/m²)</p></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="metric-box"><h3>{bone_age:.1f}</h3><p>Bone Age</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-box"><h3>{bone_age:.1f}</h3><p>Bone Age (yrs)</p></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="metric-box"><h3>{secondary_count}</h3><p>Signs Present</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-box"><h3>{secondary_count}</h3><p>Sexual Maturity Signs</p></div>', unsafe_allow_html=True)
         
         st.divider()
         
-        # -------- GROWTH CHART --------
+        # Growth Chart
         fig, ax1 = plt.subplots(figsize=(8, 10))
         
         # Height plot
@@ -389,80 +511,100 @@ with right:
         
         st.divider()
         
-        # -------- DETAILED ANALYSIS --------
-        st.markdown("### 🧠 Detailed Analysis")
+        # Detailed Analysis
+        st.markdown("### 🧠 Clinical Analysis Summary")
         
         st.markdown(f"""
-        **📏 Growth Parameters:**
+        **📏 Anthropometric Measurements:**
         - Height: {height:.1f} cm ({height_perc})
         - Weight: {weight:.1f} kg ({weight_perc})
         - BMI: {bmi:.1f} kg/m²
         
-        **🦴 Bone Age Assessment:**
-        - Chronological Age: {age:.1f} years
+        **🦴 Skeletal Maturation Assessment:**
+        - Chronological Age: {age:.1f} years ({st.session_state.age_text})
         - Bone Age: {bone_age:.1f} years
-        - Difference: {bone_age_diff:+.1f} years
+        - Bone Age Advancement: {bone_age_diff:+.1f} years
         
-        **🔬 Sexual Development:**
-        - Signs Present: {secondary_count} characteristics
-        - Family History: {"Yes" if family_history else "No"}
+        **🔬 Sexual Maturation Status:**
+        - Secondary Sexual Characteristics: {secondary_count} signs present
+        - Family History: {"Positive" if family_history else "Negative"}
         """)
         
-        # -------- RISK ASSESSMENT --------
+        # Risk Assessment
         risk_level = assess_risk_level(age, gender, secondary_count, bone_age_diff)
         
-        st.markdown("### ⚕️ Clinical Risk Assessment")
+        st.markdown("### ⚕️ Clinical Risk Stratification")
         
         if risk_level == "high":
             st.markdown('<div class="risk-high">', unsafe_allow_html=True)
-            st.markdown("#### 🔴 High Risk - Medical Consultation Required")
+            st.markdown("#### 🔴 High Risk - Urgent Endocrinology Referral Required")
             st.markdown("""
-            **Recommendations:**
-            - Urgent consultation with Pediatric Endocrinologist recommended
-            - Comprehensive evaluation needed:
-              - Bone Age X-ray (if not done)
-              - Hormone Levels (LH, FSH, Estradiol/Testosterone)
-              - Brain MRI (if indicated)
-            - Close growth monitoring required
-            - Consider GnRH analogue therapy to delay development
-            - Early intervention can prevent complications
+            **Clinical Recommendations:**
+            - **Immediate referral** to Pediatric Endocrinologist
+            - **Comprehensive diagnostic workup:**
+              - Skeletal maturation (bone age X-ray if not completed)
+              - Hormonal evaluation (LH, FSH, Estradiol/Testosterone, DHEA-S)
+              - GnRH stimulation test (if indicated)
+              - Brain MRI to rule out CNS pathology
+              - Thyroid function tests (TSH, Free T4)
+            - **Growth velocity monitoring** every 3 months
+            - **Treatment consideration:** GnRH analogue therapy
+            - Early intervention may prevent:
+              - Adult short stature
+              - Psychosocial complications
+              - Premature epiphyseal closure
             """)
             st.markdown('</div>', unsafe_allow_html=True)
             
         elif risk_level == "medium":
             st.markdown('<div class="risk-medium">', unsafe_allow_html=True)
-            st.markdown("#### 🟡 Moderate Risk - Follow-up Recommended")
+            st.markdown("#### 🟡 Moderate Risk - Endocrinology Evaluation Recommended")
             st.markdown("""
-            **Recommendations:**
+            **Clinical Recommendations:**
             - Schedule evaluation with Pediatric Endocrinologist
-            - Monitor growth every 3-6 months
-            - Track development of secondary sexual characteristics
-            - Document changes systematically
-            - Consider Bone Age X-ray for accurate assessment
-            - Re-evaluate if progression continues
+            - **Serial monitoring protocol:**
+              - Growth parameters every 3-6 months
+              - Tanner staging assessment
+              - Growth velocity calculation
+            - **Diagnostic considerations:**
+              - Bone age radiography (if not performed)
+              - Baseline hormonal screening
+            - **Documentation requirements:**
+              - Systematic recording of pubertal progression
+              - Growth chart plotting
+            - Re-evaluation if progression accelerates
+            - Parental education regarding precocious puberty
             """)
             st.markdown('</div>', unsafe_allow_html=True)
             
         else:
             st.markdown('<div class="risk-low">', unsafe_allow_html=True)
-            st.markdown("#### 🟢 Low Risk - Normal Development")
+            st.markdown("#### 🟢 Low Risk - Normal Development Pattern")
             st.markdown("""
-            **Recommendations:**
+            **Clinical Recommendations:**
             - Growth and development within normal parameters
-            - Continue routine growth monitoring
-            - Regular annual health check-ups
-            - Consult physician if unusual changes occur
-            - Maintain healthy lifestyle habits
+            - **Routine surveillance:**
+              - Annual well-child examinations
+              - Growth monitoring on standard curves
+              - Pubertal development tracking
+            - **Anticipatory guidance:**
+              - Normal puberty education
+              - Healthy lifestyle counseling
+            - **Re-evaluation criteria:**
+              - Rapid progression of secondary sexual characteristics
+              - Accelerated growth velocity
+              - Parental concerns
+            - No intervention required at this time
             """)
             st.markdown('</div>', unsafe_allow_html=True)
         
         st.divider()
         
         # Warning and disclaimer
-        st.warning("⚠️ **Important Notice:** This system is a screening tool for educational purposes only. AI assessment provides preliminary analysis and cannot replace professional medical diagnosis. Always consult qualified healthcare professionals for accurate diagnosis and treatment planning.")
+        st.warning("⚠️ **Medical Disclaimer:** This screening tool is designed for educational purposes and preliminary assessment only. AI-based bone age evaluation provides supplementary information and cannot replace professional radiological interpretation or clinical judgment. All findings must be confirmed by qualified healthcare professionals. This system is not FDA-approved for diagnostic purposes and should not be used as the sole basis for clinical decision-making.")
         
         if not bone_age_known and not xray:
-            st.info("💡 **Note:** Bone Age estimation without X-ray is approximate. For accurate assessment, hand/wrist X-ray evaluation is recommended.")
+            st.info("💡 **Clinical Note:** Bone age estimation without radiographic assessment is approximate and based on clinical parameters. For accurate skeletal maturation assessment, hand/wrist radiography (Greulich-Pyle or Tanner-Whitehouse method) is recommended.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -470,10 +612,11 @@ with right:
 st.divider()
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 20px;'>
-    <p><strong>Early Puberty Screening System v3.0 AI-Powered</strong></p>
+    <p><strong>Early Puberty Screening System v3.1 AI-Enhanced</strong></p>
     <p>Clinical Decision Support Tool | Educational & Screening Purposes Only</p>
-    <p style='font-size: 12px;'>📚 References: Thai CDC Growth Charts, WHO Standards, Pediatric Endocrinology Guidelines</p>
-    <p style='font-size: 12px;'>🤖 AI Technology: Teachable Machine by Google</p>
-    <p style='font-size: 11px; margin-top: 10px;'>Developed for medical education and preliminary screening. Not FDA approved for clinical diagnosis.</p>
+    <p style='font-size: 12px;'>📚 References: Thai CDC Growth Charts, WHO Growth Standards, Pediatric Endocrinology Clinical Guidelines</p>
+    <p style='font-size: 12px;'>🤖 AI Technology: Teachable Machine by Google (TensorFlow.js)</p>
+    <p style='font-size: 11px; margin-top: 10px;'>Developed for medical education and preliminary screening. Not FDA approved for clinical diagnosis.<br>
+    Always consult board-certified pediatric endocrinologists for definitive diagnosis and treatment.</p>
 </div>
 """, unsafe_allow_html=True)
