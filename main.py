@@ -353,8 +353,27 @@ with left:
     # Use calculated age
     age = st.session_state.calculated_age if st.session_state.calculated_age else 8.5
     
-    height = st.number_input("Height (cm)", 50.0, 200.0, 130.0, step=0.1)
-    weight = st.number_input("Weight (kg)", 2.0, 120.0, 35.0, step=0.1)
+    st.markdown("**Current Measurements:**")
+    col1, col2 = st.columns(2)
+    with col1:
+        height = st.number_input("Height (cm)", 50.0, 200.0, 130.0, step=0.1, key="current_height")
+    with col2:
+        weight = st.number_input("Weight (kg)", 2.0, 120.0, 35.0, step=0.1, key="current_weight")
+    
+    st.markdown("---")
+    st.markdown("**6-Month Previous Measurements:** (for Growth Velocity Assessment)")
+    
+    has_previous = st.checkbox("📊 I have measurements from 6 months ago")
+    
+    if has_previous:
+        col3, col4 = st.columns(2)
+        with col3:
+            height_6m = st.number_input("Height 6m ago (cm)", 50.0, 200.0, 125.0, step=0.1, key="prev_height")
+        with col4:
+            weight_6m = st.number_input("Weight 6m ago (kg)", 2.0, 120.0, 32.0, step=0.1, key="prev_weight")
+    else:
+        height_6m = None
+        weight_6m = None
     
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -451,8 +470,41 @@ with right:
         weight_perc = calculate_weight_percentile(age, weight)
         bone_age_diff = bone_age - age
         
+        # Calculate growth velocity if previous data available
+        if has_previous and height_6m and weight_6m:
+            height_velocity = (height - height_6m) / 0.5  # cm/year
+            weight_velocity = (weight - weight_6m) / 0.5  # kg/year
+            height_change = height - height_6m
+            weight_change = weight - weight_6m
+            
+            # Normal growth velocity ranges (approximate)
+            # Girls 6-8y: 5-6 cm/year, 8-12y: 5-10 cm/year (peak ~8-9 cm/year)
+            # Boys 8-10y: 4-6 cm/year, 10-14y: 5-12 cm/year (peak ~9-10 cm/year)
+            if gender == "Female":
+                if age < 8:
+                    normal_velocity_range = "5-6 cm/year"
+                    accelerated = height_velocity > 7
+                else:
+                    normal_velocity_range = "5-10 cm/year"
+                    accelerated = height_velocity > 10
+            else:  # Male
+                if age < 10:
+                    normal_velocity_range = "4-6 cm/year"
+                    accelerated = height_velocity > 7
+                else:
+                    normal_velocity_range = "5-12 cm/year"
+                    accelerated = height_velocity > 12
+        else:
+            height_velocity = None
+            weight_velocity = None
+            accelerated = False
+        
         # Display metrics
-        col1, col2, col3 = st.columns(3)
+        if has_previous and height_velocity:
+            col1, col2, col3, col4 = st.columns(4)
+        else:
+            col1, col2, col3 = st.columns(3)
+            
         with col1:
             st.markdown(f'<div class="metric-box"><h3>{bmi:.1f}</h3><p>BMI (kg/m²)</p></div>', unsafe_allow_html=True)
         with col2:
@@ -460,9 +512,105 @@ with right:
         with col3:
             st.markdown(f'<div class="metric-box"><h3>{secondary_count}</h3><p>Sexual Maturity Signs</p></div>', unsafe_allow_html=True)
         
+        if has_previous and height_velocity:
+            with col4:
+                velocity_color = "#dc2626" if accelerated else "#10b981"
+                st.markdown(f'<div class="metric-box" style="background: linear-gradient(135deg, {velocity_color} 0%, {velocity_color}dd 100%);"><h3>{height_velocity:.1f}</h3><p>Growth Velocity<br>(cm/year)</p></div>', unsafe_allow_html=True)
+        
         st.divider()
         
+        # Growth Velocity Comparison (if previous data available)
+        if has_previous and height_velocity:
+            st.markdown("### 📈 Growth Velocity Analysis (6-Month Comparison)")
+            
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                st.markdown(f"""
+                **Height Changes:**
+                - Current Height: {height:.1f} cm
+                - 6 Months Ago: {height_6m:.1f} cm
+                - Change: +{height_change:.1f} cm
+                - **Growth Velocity: {height_velocity:.1f} cm/year**
+                - Normal Range: {normal_velocity_range}
+                - Status: {"⚠️ **ACCELERATED**" if accelerated else "✅ Normal"}
+                """)
+            
+            with col_b:
+                st.markdown(f"""
+                **Weight Changes:**
+                - Current Weight: {weight:.1f} kg
+                - 6 Months Ago: {weight_6m:.1f} kg
+                - Change: +{weight_change:.1f} kg
+                - **Weight Velocity: {weight_velocity:.1f} kg/year**
+                """)
+            
+            # Growth velocity visualization
+            fig_velocity, (ax_h, ax_w) = plt.subplots(1, 2, figsize=(10, 4))
+            
+            # Height comparison
+            categories_h = ['6 Months Ago', 'Current']
+            heights = [height_6m, height]
+            colors_h = ['#94a3b8', '#10b981' if not accelerated else '#dc2626']
+            
+            ax_h.bar(categories_h, heights, color=colors_h, alpha=0.8, edgecolor='black', linewidth=2)
+            ax_h.set_ylabel('Height (cm)', fontweight='bold')
+            ax_h.set_title('Height Comparison', fontweight='bold', fontsize=12)
+            ax_h.grid(axis='y', alpha=0.3)
+            
+            # Add value labels
+            for i, v in enumerate(heights):
+                ax_h.text(i, v + 1, f'{v:.1f} cm', ha='center', fontweight='bold')
+            
+            # Add growth arrow
+            ax_h.annotate('', xy=(1, height), xytext=(0, height_6m),
+                         arrowprops=dict(arrowstyle='->', lw=2, color='blue', alpha=0.5))
+            ax_h.text(0.5, (height + height_6m) / 2, f'+{height_change:.1f} cm\n({height_velocity:.1f} cm/yr)',
+                     ha='center', fontsize=10, fontweight='bold', color='blue',
+                     bbox=dict(boxstyle='round,pad=0.5', facecolor='lightblue', alpha=0.7))
+            
+            # Weight comparison
+            categories_w = ['6 Months Ago', 'Current']
+            weights = [weight_6m, weight]
+            colors_w = ['#94a3b8', '#764ba2']
+            
+            ax_w.bar(categories_w, weights, color=colors_w, alpha=0.8, edgecolor='black', linewidth=2)
+            ax_w.set_ylabel('Weight (kg)', fontweight='bold')
+            ax_w.set_title('Weight Comparison', fontweight='bold', fontsize=12)
+            ax_w.grid(axis='y', alpha=0.3)
+            
+            # Add value labels
+            for i, v in enumerate(weights):
+                ax_w.text(i, v + 0.5, f'{v:.1f} kg', ha='center', fontweight='bold')
+            
+            # Add growth arrow
+            ax_w.annotate('', xy=(1, weight), xytext=(0, weight_6m),
+                         arrowprops=dict(arrowstyle='->', lw=2, color='purple', alpha=0.5))
+            ax_w.text(0.5, (weight + weight_6m) / 2, f'+{weight_change:.1f} kg\n({weight_velocity:.1f} kg/yr)',
+                     ha='center', fontsize=10, fontweight='bold', color='purple',
+                     bbox=dict(boxstyle='round,pad=0.5', facecolor='plum', alpha=0.7))
+            
+            plt.tight_layout()
+            st.pyplot(fig_velocity)
+            
+            # Clinical interpretation of growth velocity
+            if accelerated:
+                st.warning(f"""
+                ⚠️ **Accelerated Growth Velocity Detected**
+                
+                The growth velocity of {height_velocity:.1f} cm/year exceeds the normal range ({normal_velocity_range}) 
+                for a {age:.1f}-year-old {gender.lower()}. Accelerated linear growth may indicate:
+                - Early pubertal development
+                - Growth hormone excess
+                - Precocious puberty
+                
+                This finding **supports the need for endocrinology evaluation** when combined with other clinical signs.
+                """)
+            
+            st.divider()
+        
         # Growth Chart
+        st.markdown("### 📊 Growth Chart Analysis")
         fig, ax1 = plt.subplots(figsize=(8, 10))
         
         # Height plot
@@ -514,11 +662,25 @@ with right:
         # Detailed Analysis
         st.markdown("### 🧠 Clinical Analysis Summary")
         
-        st.markdown(f"""
+        analysis_text = f"""
         **📏 Anthropometric Measurements:**
         - Height: {height:.1f} cm ({height_perc})
         - Weight: {weight:.1f} kg ({weight_perc})
         - BMI: {bmi:.1f} kg/m²
+        """
+        
+        if has_previous and height_velocity:
+            analysis_text += f"""
+        
+        **📈 Growth Velocity (6-Month Data):**
+        - Height Velocity: {height_velocity:.1f} cm/year (Normal: {normal_velocity_range})
+        - Weight Velocity: {weight_velocity:.1f} kg/year
+        - Height Change: +{height_change:.1f} cm in 6 months
+        - Weight Change: +{weight_change:.1f} kg in 6 months
+        - Assessment: {"⚠️ Accelerated Growth" if accelerated else "✅ Normal Growth Pattern"}
+        """
+        
+        analysis_text += f"""
         
         **🦴 Skeletal Maturation Assessment:**
         - Chronological Age: {age:.1f} years ({st.session_state.age_text})
@@ -528,10 +690,17 @@ with right:
         **🔬 Sexual Maturation Status:**
         - Secondary Sexual Characteristics: {secondary_count} signs present
         - Family History: {"Positive" if family_history else "Negative"}
-        """)
+        """
+        
+        st.markdown(analysis_text)
         
         # Risk Assessment
         risk_level = assess_risk_level(age, gender, secondary_count, bone_age_diff)
+        
+        # Upgrade risk if accelerated growth velocity is present
+        if has_previous and accelerated:
+            if risk_level == "low":
+                risk_level = "medium"
         
         st.markdown("### ⚕️ Clinical Risk Stratification")
         
@@ -605,6 +774,9 @@ with right:
         
         if not bone_age_known and not xray:
             st.info("💡 **Clinical Note:** Bone age estimation without radiographic assessment is approximate and based on clinical parameters. For accurate skeletal maturation assessment, hand/wrist radiography (Greulich-Pyle or Tanner-Whitehouse method) is recommended.")
+        
+        if not has_previous:
+            st.info("💡 **Growth Velocity Note:** For more comprehensive assessment, obtaining measurements from 6 months ago allows calculation of growth velocity, which is an important indicator of pubertal development and precocious puberty risk.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
