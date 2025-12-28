@@ -629,49 +629,110 @@ with right:
                 """)
             
             # Growth velocity visualization
-            fig_velocity, (ax_h, ax_w) = plt.subplots(1, 2, figsize=(10, 4))
+            fig_velocity, (ax_h, ax_w) = plt.subplots(1, 2, figsize=(12, 5))
             
             # Height comparison
             categories_h = ['6 Months Ago', 'Current']
             heights = [height_6m, height]
             colors_h = ['#94a3b8', '#10b981' if not accelerated else '#dc2626']
             
-            ax_h.bar(categories_h, heights, color=colors_h, alpha=0.8, edgecolor='black', linewidth=2)
-            ax_h.set_ylabel('Height (cm)', fontweight='bold')
-            ax_h.set_title('Height Comparison', fontweight='bold', fontsize=12)
-            ax_h.grid(axis='y', alpha=0.3)
+            bars_h = ax_h.bar(categories_h, heights, color=colors_h, alpha=0.8, edgecolor='black', linewidth=2)
+            ax_h.set_ylabel('Height (cm)', fontweight='bold', fontsize=11)
+            ax_h.set_title('Height Comparison', fontweight='bold', fontsize=13, pad=15)
+            ax_h.grid(axis='y', alpha=0.3, linestyle='--')
             
-            # Add value labels
-            for i, v in enumerate(heights):
-                ax_h.text(i, v + 1, f'{v:.1f} cm', ha='center', fontweight='bold')
+            # Add value labels on top of bars
+            for i, (bar, v) in enumerate(zip(bars_h, heights)):
+                height_bar = bar.get_height()
+                ax_h.text(bar.get_x() + bar.get_width()/2., height_bar + (max(heights) * 0.02),
+                         f'{v:.1f} cm',
+                         ha='center', va='bottom', fontweight='bold', fontsize=10)
             
-            # Add growth arrow
-            ax_h.annotate('', xy=(1, height), xytext=(0, height_6m),
-                         arrowprops=dict(arrowstyle='->', lw=2, color='blue', alpha=0.5))
-            ax_h.text(0.5, (height + height_6m) / 2, f'+{height_change:.1f} cm\n({height_velocity:.1f} cm/yr)',
-                     ha='center', fontsize=10, fontweight='bold', color='blue',
-                     bbox=dict(boxstyle='round,pad=0.5', facecolor='lightblue', alpha=0.7))
+            # Add curved arrow and text box positioned better
+            # Position arrow higher to avoid overlap
+            arrow_y_start = height_6m + (height - height_6m) * 0.15
+            arrow_y_end = height - (height - height_6m) * 0.15
+            
+            ax_h.annotate('', 
+                         xy=(0.85, arrow_y_end), 
+                         xytext=(0.15, arrow_y_start),
+                         arrowprops=dict(
+                             arrowstyle='->', 
+                             lw=2.5, 
+                             color='#3b82f6', 
+                             alpha=0.7,
+                             connectionstyle="arc3,rad=.3"
+                         ))
+            
+            # Position text box to the right side to avoid bar overlap
+            text_x = 0.5
+            text_y = (height + height_6m) / 2
+            ax_h.text(text_x, text_y, 
+                     f'(+{height_change:.1f} cm)\n{height_velocity:.1f} cm/yr',
+                     ha='center', va='center',
+                     fontsize=9, fontweight='bold', 
+                     color='white',
+                     bbox=dict(
+                         boxstyle='round,pad=0.6', 
+                         facecolor='#3b82f6', 
+                         alpha=0.85,
+                         edgecolor='#1e40af',
+                         linewidth=1.5
+                     ))
+            
+            # Set y-axis limits with padding
+            ax_h.set_ylim(0, max(heights) * 1.15)
             
             # Weight comparison
             categories_w = ['6 Months Ago', 'Current']
             weights = [weight_6m, weight]
-            colors_w = ['#94a3b8', '#764ba2']
+            colors_w = ['#94a3b8', '#8b5cf6']
             
-            ax_w.bar(categories_w, weights, color=colors_w, alpha=0.8, edgecolor='black', linewidth=2)
-            ax_w.set_ylabel('Weight (kg)', fontweight='bold')
-            ax_w.set_title('Weight Comparison', fontweight='bold', fontsize=12)
-            ax_w.grid(axis='y', alpha=0.3)
+            bars_w = ax_w.bar(categories_w, weights, color=colors_w, alpha=0.8, edgecolor='black', linewidth=2)
+            ax_w.set_ylabel('Weight (kg)', fontweight='bold', fontsize=11)
+            ax_w.set_title('Weight Comparison', fontweight='bold', fontsize=13, pad=15)
+            ax_w.grid(axis='y', alpha=0.3, linestyle='--')
             
-            # Add value labels
-            for i, v in enumerate(weights):
-                ax_w.text(i, v + 0.5, f'{v:.1f} kg', ha='center', fontweight='bold')
+            # Add value labels on top of bars
+            for i, (bar, v) in enumerate(zip(bars_w, weights)):
+                height_bar = bar.get_height()
+                ax_w.text(bar.get_x() + bar.get_width()/2., height_bar + (max(weights) * 0.02),
+                         f'{v:.1f} kg',
+                         ha='center', va='bottom', fontweight='bold', fontsize=10)
             
-            # Add growth arrow
-            ax_w.annotate('', xy=(1, weight), xytext=(0, weight_6m),
-                         arrowprops=dict(arrowstyle='->', lw=2, color='purple', alpha=0.5))
-            ax_w.text(0.5, (weight + weight_6m) / 2, f'+{weight_change:.1f} kg\n({weight_velocity:.1f} kg/yr)',
-                     ha='center', fontsize=10, fontweight='bold', color='purple',
-                     bbox=dict(boxstyle='round,pad=0.5', facecolor='plum', alpha=0.7))
+            # Add curved arrow and text box positioned better
+            arrow_y_start_w = weight_6m + (weight - weight_6m) * 0.15
+            arrow_y_end_w = weight - (weight - weight_6m) * 0.15
+            
+            ax_w.annotate('', 
+                         xy=(0.85, arrow_y_end_w), 
+                         xytext=(0.15, arrow_y_start_w),
+                         arrowprops=dict(
+                             arrowstyle='->', 
+                             lw=2.5, 
+                             color='#8b5cf6', 
+                             alpha=0.7,
+                             connectionstyle="arc3,rad=.3"
+                         ))
+            
+            # Position text box
+            text_x_w = 0.5
+            text_y_w = (weight + weight_6m) / 2
+            ax_w.text(text_x_w, text_y_w, 
+                     f'(+{weight_change:.1f} kg)\n{weight_velocity:.1f} kg/yr',
+                     ha='center', va='center',
+                     fontsize=9, fontweight='bold', 
+                     color='white',
+                     bbox=dict(
+                         boxstyle='round,pad=0.6', 
+                         facecolor='#8b5cf6', 
+                         alpha=0.85,
+                         edgecolor='#6d28d9',
+                         linewidth=1.5
+                     ))
+            
+            # Set y-axis limits with padding
+            ax_w.set_ylim(0, max(weights) * 1.15)
             
             plt.tight_layout()
             st.pyplot(fig_velocity)
